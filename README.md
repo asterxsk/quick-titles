@@ -104,8 +104,10 @@ be started, every adapter degrades to doing nothing — no title, no error, no s
 | **opencode2** (beta) | Plugin API | Session name |
 | **Pi** | Extension API | Session name |
 
-**Known limitation:** ChatGPT-app Codex threads cannot be titled — those titles live on OpenAI's
-servers, and there is no supported way to write one.
+**Known limitation:** ChatGPT-app Codex threads are not titled yet. The desktop app shares the CLI's
+local thread store and the write path is implemented, but the trigger that would fire it has never
+been observed — see [adapter verification](docs/adapter-verification.md). Earlier revisions of these
+docs said the titles live on OpenAI's servers; that was wrong.
 
 ## Requirements
 

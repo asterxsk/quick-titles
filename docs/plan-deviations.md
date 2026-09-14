@@ -2182,3 +2182,39 @@ dependencies' own floors (`node-llama-cpp` `>=20.0.0`, `smol-toml` `>=18`) and o
 using a Node 22+ API, which is a human judgement rather than a checked one. Either backing it with a
 real check or narrowing `engines` to `>=22` is a decision to take deliberately, not by accident of a
 matrix edit.
+
+---
+
+## D61 — The design spec's reason for excluding the ChatGPT desktop app was factually wrong
+
+The spec lists **"Titles for ChatGPT-app Codex threads"** as a non-goal, with this reason:
+
+> Read-only at best. Those titles live on OpenAI's servers; the local row in
+> `codex-dev.db → local_thread_catalog` is a replica the app overwrites on sync. No local file is
+> authoritative and no local push path exists.
+
+Every clause of that is wrong, and the error propagated into `README.md`, `CHANGELOG.md` and
+`docs/install.md`, where it survived until the code was written and tested.
+
+The desktop app is an app-server client on the CLI's own store. Measured on the verifying machine:
+
+- `~/.codex/state_5.sqlite` → `threads` carries `title` **and** `name` columns, and `thread/name/set`
+  lands in `name` synchronously — the same path D29 validated against `codex-cli 0.153.4`.
+- `remote_control_enrollments.app_server_client_name = "Codex Desktop"` in that database names the
+  app as a client of that store.
+- The file the spec named, `codex-dev.db → local_thread_catalog`, is not the authority any of this
+  reads, and no code in this repository touches it.
+
+So the exclusion is not a capability finding. What is genuinely unknown is the **trigger**: `notify`
+is a CLI config key, and it has not been observed firing from the desktop app
+(openai/codex#13019 — OpenAI says it should, one user measured on 0.106.0 that it does not). Even a
+successful write may not repaint the desktop sidebar live (#25456), and a state-DB rebuild
+regenerates rows from rollout files that do not carry the name (#41614).
+
+The non-goal is therefore narrowed rather than removed: **write path implemented, trigger unverified.**
+Claiming support stays off the table until the trigger is observed. See
+[adapter-verification.md](adapter-verification.md) for the current statement. The trigger test is
+still open.
+
+The spec and plan are dated records and are left as they were written — this entry is the correction,
+which is what this file is for.

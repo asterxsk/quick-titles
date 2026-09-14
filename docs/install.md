@@ -223,8 +223,9 @@ checked, so the answer is checkable rather than a bare "done".
 
 ## What is not supported
 
-- **ChatGPT-app Codex threads cannot be titled.** Their titles live on OpenAI's servers, and there is
-  no supported way for a local tool to write one. The Codex *CLI* is fully supported.
+- **ChatGPT-app Codex threads are not titled yet.** The desktop app shares the CLI's local thread
+  store (`~/.codex/state_5.sqlite`), so the write path is implemented, but the trigger has never been
+  observed firing. The Codex *CLI* is fully supported.
 - **Session recap.** quick-titles writes titles and descriptions, not summaries of a whole session.
 
 ## Troubleshooting

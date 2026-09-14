@@ -61,8 +61,9 @@ description, which no host agent has a field for, is surfaced by `quick-titles s
   published as a release asset, and not downloadable from this project — the model's licence
   forbids redistributing it as a standalone model. `provision` fetches it inside the app, and a
   build without a published weights URL says so and names both ways to supply one.
-- **ChatGPT-app Codex threads cannot be titled.** Their titles live on OpenAI's servers and there
-  is no supported way for a local tool to write one. The Codex CLI is fully supported.
+- **ChatGPT-app Codex threads are not titled yet.** The desktop app shares the CLI's local thread
+  store, so the write path exists, but the trigger that would fire it has never been observed. The
+  Codex CLI is fully supported.
 - All credit for the model belongs to [Desert Ant Labs](https://huggingface.co/desert-ant-labs/title).
 
 [Unreleased]: https://github.com/asterxsk/quick-titles/compare/v0.1.0...HEAD
