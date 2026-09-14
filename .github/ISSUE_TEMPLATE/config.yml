@@ -1,0 +1,36 @@
+# The "choose an issue type" page.
+#
+# The two links here are the routes a report should take before it becomes an
+# issue, because both have a structured form that gets to an answer faster than
+# a blank text box.
+#
+# Why there is no Markdown template alongside the two YAML issue forms: the
+# template chooser renders issue forms fine, but GitHub's metadata APIs do not
+# see them. `repository.issueTemplates` in GraphQL returns an empty list for
+# this repository, and the community profile at
+# `/repos/{owner}/{repo}/community/profile` therefore reports `issue_template`
+# as missing and caps the profile at 85%, with the two forms sitting right there
+# on the default branch. It is the same behaviour that makes `gh issue create -T`
+# say "no templates found" on repositories that use issue forms
+# (cli/cli#11681).
+#
+# The fix for a cosmetic percentage would be to duplicate both forms as Markdown,
+# which is a second thing to keep in sync and a worse experience in the browser.
+# Not worth it. If that percentage ever matters more than the duplication does,
+# add `.github/ISSUE_TEMPLATE/bug_report.md` alongside, and keep the YAML.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Something is not working — run doctor first
+    url: https://github.com/asterxsk/quick-titles#readme
+    about: >-
+      `npx quick-titles doctor` reports the data directory, whether a model is
+      provisioned, and which backend is serving. Most "no titles are appearing"
+      reports are answered by that one command, and the bug template asks for
+      its output anyway.
+
+  - name: Report a security vulnerability
+    url: https://github.com/asterxsk/quick-titles/security/advisories/new
+    about: >-
+      Private, and visible only to you and the maintainer. Please do not open a
+      public issue for a security problem. See SECURITY.md for what is in scope.

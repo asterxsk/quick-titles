@@ -1,0 +1,62 @@
+{
+  "name": "quick-titles",
+  "version": "0.1.0",
+  "description": "On-device session titles and descriptions for Claude Code, Codex CLI, opencode2, and Pi. Powered by Desert Ant Labs.",
+  "directories": {
+    "doc": "docs"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "adapters/",
+    ".claude-plugin/",
+    "assets/",
+    "README.md",
+    "LICENSE",
+    "LICENSE-NOTICE.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.adapters.json",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm run typecheck && npm test"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "opencode",
+    "pi",
+    "session-titles",
+    "local",
+    "on-device",
+    "llama.cpp",
+    "gguf"
+  ],
+  "author": "asterxsk",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asterxsk/quick-titles.git"
+  },
+  "homepage": "https://github.com/asterxsk/quick-titles#readme",
+  "bugs": {
+    "url": "https://github.com/asterxsk/quick-titles/issues"
+  },
+  "type": "module",
+  "bin": {
+    "quick-titles": "bin/quick-titles.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.85.1",
+    "@types/node": "^26.5.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  },
+  "dependencies": {
+    "node-llama-cpp": "^3.21.1",
+    "smol-toml": "^1.8.0"
+  }
+}

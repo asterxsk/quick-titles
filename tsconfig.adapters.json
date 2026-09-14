@@ -1,0 +1,21 @@
+// Type checking for the adapters, which `tsconfig.json` does not cover.
+//
+// The root config's `include` is `["src"]`, and vitest does not type check, so
+// nothing verified the adapters' hand-written declarations of the client's
+// signatures. That gap was not theoretical: `adapters/pi/quick-titles.ts`
+// declared its own `Generate` / `ensureDaemon` shapes and silently drifted from
+// `src/client.ts`, which produced a real defect — the adapter called
+// `generate()` without a timeout bound and raced a cold daemon (D40).
+//
+// `src` is included alongside the adapters so a change to the client's
+// signatures is checked against every adapter in the same run. Emit is off: this
+// config exists only to fail on drift.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "rootDir": "."
+  },
+  "include": ["src", "adapters/**/*.ts"]
+}

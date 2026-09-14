@@ -1,0 +1,107 @@
+# Continuous integration.
+#
+# The product ships adapters for four hosts on three platforms, and much of the
+# code has an explicit `process.platform` branch — the Pi installer resolves
+# Windows shell paths, the socket is a named pipe on win32 and a unix socket
+# elsewhere, and the store lives in a different directory on each OS. A single
+# Linux job would pass while the shipped Windows path was broken, so the matrix
+# is over operating systems first and Node versions second.
+#
+# `npm run build` comes before `npm test` on purpose: the adapters load
+# `dist/client.js` at runtime and there is no test that can pass without it.
+#
+# The weights are not here and cannot be. `tests/core/inference.test.ts` skips
+# itself unless QT_MODEL names a file, so the suite runs fully without a model.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # PR-only. Every push to `refs/heads/main` shares the group `ci-refs/heads/main`,
+  # so `true` here cancels the in-flight run of the previous commit and that
+  # commit never gets a complete matrix — which happened once already. Superseding
+  # a PR's own older runs is wanted; discarding main's verification is not.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: ${{ matrix.os }} / node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing must not cancel the others: on this project the
+      # interesting failures have been platform-specific, and the whole point of
+      # the matrix is to see all of them in one run.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # 22 and 24, not 20. vitest 5 declares `^22.12.0 || ^24.0.0 || >=26.0.0`
+        # and the Pi SDK declares `>=22.19.0`, so Node 20 is below both of their
+        # floors — the suite did run there, but only by npm downgrading the
+        # mismatch to an EBADENGINE warning, which is a green result on a runtime
+        # the toolchain does not support. 24 is the current LTS and had no
+        # coverage at all.
+        node: ["22", "24"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # node-llama-cpp resolves a prebuilt binary at install time, which is the
+      # slow step here. Nothing in this repo ever compiles llama.cpp from source.
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # A crash inside a test can leave the daemon or a fixture directory behind.
+      # This does not fail the build; it makes the leak visible in the log before
+      # someone spends an afternoon wondering why the suite is flaky.
+      #
+      # The test is emptiness, not existence. `tests/helpers/tmp.ts` creates
+      # `<repo>/.tmp` on every `tempDir` call and cleanup removes only the child
+      # directories, never the root — so `.tmp` is always present, a `[ -d .tmp ]`
+      # test always fires, and every clean run used to print the alarming
+      # "leftovers under .tmp:" header followed by nothing. A diagnostic that
+      # cries wolf on every green run is one people learn to skip.
+      #
+      # The scratch roots the suite itself creates are listed, not just `.tmp`: a
+      # leak into `tests/adapters/.tmp-*` or `__QUICK_TITLES_DIST__/` is the same
+      # class of bug and previously reported as "clean". It is not every
+      # gitignored root — `.fallow/`, `graft/`, `.probe/` and the like are
+      # gitignored and unscanned, because no test writes them and a leftover
+      # beside them would mean a different problem.
+      - name: Report leftover scratch
+        if: always()
+        shell: bash
+        run: |
+          found=0
+          for d in .tmp tests/.tmp-* tests/*/.tmp-* .verify-* .refute-* __QUICK_TITLES_DIST__; do
+            [ -e "$d" ] || continue
+            if [ -n "$(ls -A "$d" 2>/dev/null)" ]; then
+              echo "leftovers under $d:"
+              ls -1A "$d"
+              found=1
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "no leftover scratch: cleanup was complete"
+          fi
+          exit 0

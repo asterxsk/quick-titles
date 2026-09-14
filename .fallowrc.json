@@ -1,0 +1,56 @@
+// fallow configuration.
+//
+// `entry` is not optional here. quick-titles is a *host plugin*, not a library:
+// the files under `adapters/` are executables that Claude Code, Codex, the
+// opencode2 loader, and the Pi extension loader reach by absolute path from
+// their own configuration files. Nothing in this repository imports them, so
+// without this list fallow reports every adapter as an unused file and offers
+// to delete it — which would delete the product. The list is the only place
+// that records "these files are reached from outside the dependency graph".
+//
+// `bin/quick-titles.mjs` spawns each adapter's `install.mjs` and `uninstall.mjs`
+// the same way — it builds the path at runtime, so no static import of them
+// exists anywhere either.
+//
+// `ignorePatterns` excludes `spike/`, the scratch workspace where the MLX to
+// GGUF conversion was worked out. It is gitignored, ships nothing, and its
+// throwaway helper packages produce dead-code findings about code that is not
+// part of the project.
+//
+// `ignoreDependencies` is here for one package, and the finding it silences is
+// correct about the facts and wrong about the conclusion. The Pi installer
+// imports `@earendil-works/pi-coding-agent` from production code, and fallow
+// reads that as "this must be a dependency". It must not be. Pi is the host:
+// its SDK is installed by Pi, in Pi's own prefix, at the version Pi actually
+// runs. Taking our own copy would ship the Pi SDK to every quick-titles user
+// whether or not they use Pi, and worse, it would let the installed extension
+// answer to a different version than the loader that reads it.
+//
+// So the import is deliberately optional — inside a try/catch, with a
+// hand-written equivalent of the SDK's getAgentDir() as the fallback branch
+// (adapters/pi/install.mjs). That fallback is not dead weight either: `npx`
+// does not install devDependencies, so for every published-package user it is
+// the *only* branch that runs. A test binds the two together. devDependency is
+// the correct classification; the finding is the one thing that is not.
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  "entry": [
+    "adapters/claude-code/scripts/session-start.mjs",
+    "adapters/claude-code/scripts/sessions.mjs",
+    "adapters/claude-code/scripts/user-prompt.mjs",
+    "adapters/codex/install.mjs",
+    "adapters/codex/notify.mjs",
+    "adapters/codex/uninstall.mjs",
+    "adapters/opencode2/install.mjs",
+    "adapters/opencode2/plugin.ts",
+    "adapters/opencode2/uninstall.mjs",
+    "adapters/pi/install.mjs",
+    "adapters/pi/quick-titles.ts",
+    "adapters/pi/uninstall.mjs",
+    "bin/quick-titles.mjs",
+    "src/daemon/main.ts",
+    "tools/**/*.mjs"
+  ],
+  "ignorePatterns": ["spike/**"],
+  "ignoreDependencies": ["@earendil-works/pi-coding-agent"]
+}

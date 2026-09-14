@@ -1,0 +1,5 @@
+{"type":"user","message":{"role":"user","content":"Help me refactor the auth middleware to use dependency injection."}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll start by reading the current middleware and its tests."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"file_path":"src/auth.ts"}}]}}
+{"type":"user","message":{"role":"user","content":"The tests pass now, but add a case for expired tokens."}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Added a test covering expired-token rejection and updated the fixture."}]}}

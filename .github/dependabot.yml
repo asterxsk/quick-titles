@@ -1,0 +1,61 @@
+# Dependency updates.
+#
+# Two ecosystems: npm, and `github-actions` — the actions are pinned by version
+# tag (`@v4`) rather than by SHA, which is exactly what the github-actions
+# updater bumps, so that block is live and not decoration. There are no Docker
+# or pip manifests in the shipped tree; the Python toolchain in
+# `.github/workflows/convert-model.yml` is not tracked here.
+#
+# Grouped, because this tree is dominated by one transitive explosion: the Pi
+# SDK is a devDependency that pulls in the AWS SDK, the Anthropic SDK and their
+# dependents, so an ungrouped Dependabot opens dozens of single-package PRs a
+# week and the real ones are lost among them.
+#
+# Every group is capped at minor and patch. Majors land as their own PR, never
+# folded into a group: a major here has changed the API before, and a grouped
+# bump would hide which one broke it. Leaving `update-types` off a group would
+# include majors in it by default, which is why each one states it explicitly.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # The one that matters for users: can a title still be generated, on which
+      # backends. A minor or patch bump here changes the prebuilt binary that
+      # gets downloaded, so these want to arrive and be reviewed together.
+      #
+      # Deliberately not `ignore`d for majors. A node-llama-cpp major is the
+      # update most likely to change prebuilt-binary platform coverage or the
+      # bundled llama.cpp ABI — the one bump the "prebuilt binaries only, never
+      # compile from source" constraint needs a human to look at — so it must
+      # open a PR rather than be suppressed.
+      llama:
+        patterns:
+          - "node-llama-cpp"
+        update-types: ["minor", "patch"]
+      # The transitive blob. Nothing in the shipped code depends on a particular
+      # version of any of it.
+      pi-sdk:
+        patterns:
+          - "@earendil-works/*"
+          - "@anthropic-ai/*"
+          - "@aws-sdk/*"
+          - "@aws-crypto/*"
+          - "@smithy/*"
+        update-types: ["minor", "patch"]
+      dev-tooling:
+        patterns:
+          - "vitest"
+          - "typescript"
+          - "@types/*"
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "quick-titles",
+  "displayName": "quick-titles",
+  "version": "0.1.0",
+  "description": "Local, on-device session titles and descriptions. Powered by Desert Ant Labs.",
+  "license": "MIT"
+}

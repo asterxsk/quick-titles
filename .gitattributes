@@ -1,0 +1,24 @@
+# The two vendored prompt assets are byte-pinned, not merely text.
+#
+# `src/core/prompt.ts` compares each file's SHA-256 against a constant compiled
+# into it and throws at import when they differ, because the instruction and the
+# chat template have to reach the model exactly as the fine-tune was trained on
+# them. A paraphrase is a different task, and so is a CRLF.
+#
+# That makes git's line-ending conversion a correctness bug rather than a
+# cosmetic one. On a Windows machine with `core.autocrlf=true` — which is the
+# default on GitHub's windows runners and on most Windows installs — a plain
+# `git clone` rewrites every LF in these files to CRLF. The bytes change, the
+# hash no longer matches, and the module throws on import. CI caught this: on
+# windows-latest every test that transitively imports `dist/core/prompt.js`
+# failed, while the same commit was green on ubuntu and macos.
+#
+# `-text` (not `text eol=lf`) is deliberate. It tells git these are binary and
+# must never be converted, so what lands in the working tree is exactly the blob
+# that was committed — the invariant the hash pin actually needs. `eol=lf` would
+# also produce LF here, but it normalises the working tree toward a line ending
+# git chose rather than leaving the bytes alone, and it would silently rewrite
+# the file at checkout if a CRLF version were ever committed instead of letting
+# the hash check fail loudly.
+assets/chat_template.jinja -text
+assets/instruction.txt -text

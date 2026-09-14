@@ -1,0 +1,69 @@
+node_modules/
+dist/
+spike/
+*.gguf
+
+# Test scratch space. tests/helpers/tmp.ts roots temp dirs here instead of in
+# os.tmpdir(), which on Windows is on C: — the previous arrangement left 539
+# `qt-*` directories in %LOCALAPPDATA%\Temp because two suites never removed
+# theirs.
+.tmp/
+
+# Scratch directories agents and tests leave behind. Regenerable, never shipped,
+# and not worth committing even by accident.
+__QUICK_TITLES_DIST__/
+.verify-tmp/
+.verify-refute/
+.qt-measure-*/
+tests/.tmp-entry-*/
+rel/
+
+# The two patterns above are directory-shaped, so a verifier that wrote a plain
+# file at the repo root, or a tree under a prefix nobody anticipated, slipped
+# past them — which is how `.verify-refute-list.txt` and `.refute-9f3a2/` ended
+# up as the only entries in `git status`. Anchored at the root on purpose: these
+# are scratch harnesses, and nothing matching them is meant to be committed.
+/.verify-*
+/.refute-*
+
+# Raw fallow output captured while interpreting an audit. Large, regenerable,
+# and meaningless after the run it came from.
+.tmp-fallow-*
+
+# fallow's own graph and audit cache.
+.fallow/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# Conversion workspace and the converted model under test.
+#
+# NOT throwaway. An earlier version of this comment called .probe/ disposable,
+# and a subsequent agent reasonably deleted the whole directory mid-run — taking
+# .probe/title-q8_0.gguf with it, which is a 360 MB artifact that costs a full
+# MLX dequant + llama.cpp conversion to rebuild and cannot be re-downloaded.
+# Everything under here is regenerable in principle and expensive in practice.
+.probe/
+
+# The eval corpus, everything derived from it, and the working notes.
+#
+# `transcripts.jsonl` is 40 clips of real agent sessions pulled off this
+# machine: task text, file paths, project names, and third-party material
+# pasted into a session. The redaction in extract-transcripts.mjs strips
+# credentials, home directories and emails, but not names or relative paths,
+# so it is not publishable. It is regenerable from your own sessions — that is
+# why the extractor ships and the corpus does not:
+#
+#   node tools/eval/extract-transcripts.mjs && node tools/eval/run-eval.mjs
+#
+# `results.json` and `score.md` are output from that run and quote the same
+# sessions, so they go with it. Never commit any of these to a repository that
+# is public or may become public.
+tools/eval/transcripts.jsonl
+tools/eval/results.json
+tools/eval/score.md
+
+# Working notes — raw material written while building, not project
+# documentation. Kept on disk, deliberately not published.
+plan-notes.md
+to-delete.md

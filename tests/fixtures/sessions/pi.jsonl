@@ -1,0 +1,6 @@
+{"type":"session","version":3,"id":"fixture-session","timestamp":"2026-09-05T07:20:26.264Z","cwd":"C:\\Users\\dev"}
+{"type":"model_change","id":"4d95a9ec","parentId":null,"timestamp":"2026-09-05T07:20:29.190Z","provider":"example","modelId":"some-model"}
+{"type":"message","id":"3eefe713","parentId":"4d95a9ec","timestamp":"2026-09-05T07:20:56.801Z","message":{"role":"user","content":[{"type":"text","text":"@Downloads/retry_helper_notes.md"}],"timestamp":1788592856793}}
+{"type":"message","id":"4309073e","parentId":"3eefe713","timestamp":"2026-09-05T07:21:29.387Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"","thinkingSignature":"opaque"},{"type":"text","text":"I'll look into the flaky retry helper from the notes."}],"timestamp":1788592856970}}
+{"type":"custom_message","id":"c1","parentId":"4309073e","timestamp":"2026-09-05T07:21:30.000Z","message":{"role":"system","content":[{"type":"text","text":"background context, not a conversation turn"}]}}
+{"type":"message","id":"5149a6ce","parentId":"c1","timestamp":"2026-09-05T07:22:00.000Z","message":{"role":"user","content":[{"type":"text","text":"Start with the backoff logic and the timeout handling."}],"timestamp":1788592870000}}

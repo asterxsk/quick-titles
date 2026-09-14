@@ -1,0 +1,146 @@
+# Release.
+#
+# Tag `v0.1.0` and push the tag. Everything else is automated:
+#
+#     git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0
+#
+# The tag is re-verified before anything is published. A release built from a
+# commit that does not pass its own test suite is worse than no release, because
+# it is the one artifact users cannot inspect before trusting.
+#
+# No model weights are attached, and that is a licence term rather than an
+# oversight: Desert Ant Labs Source-Available 1.0 forbids redistributing the
+# converted GGUF as a standalone model download. quick-titles fetches it inside
+# the app, from a URL the user supplies. See README.md and LICENSE-NOTICE.md.
+#
+# Which tag is being released is resolved everywhere as
+# `github.event.inputs.tag || github.ref_name`, and the fallback is load-bearing:
+# on a tag push `inputs.tag` is empty so `ref_name` (the tag) is used, and on a
+# manual dispatch the typed tag wins. The earlier form here was
+# `${GITHUB_REF_NAME:-${{ inputs.tag }}}`, which never fell through — GITHUB_REF_NAME
+# is always populated (with the *branch* on a dispatch), so the manual release
+# path resolved to `main` and could only ever fail the tag/package.json check.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release (e.g. v0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: verify before publishing
+    runs-on: ubuntu-latest
+    steps:
+      # The tag, not the branch the dispatch was started from: verifying `main`
+      # while releasing an older tag would certify the wrong commit.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm test
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          # Generated release notes need the commits, and a shallow clone does
+          # not have them.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      # The check that catches the mistake this workflow exists to prevent: a
+      # tag that disagrees with package.json ships a version users cannot
+      # reproduce, and nothing about the build would have failed.
+      - name: Check the tag matches package.json
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$TAG"
+          pkg="v$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag $tag does not match package.json ($pkg)"
+            exit 1
+          fi
+          echo "tag $tag matches package.json"
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$TAG"
+          gh release create "$tag" \
+            --title "$tag" \
+            --generate-notes \
+            --verify-tag
+
+  # Publishing to npm is deliberately not automatic.
+  #
+  # It is a one-way, public, outward-facing action on the user's own npm
+  # account, and it is the step that makes `npx quick-titles` work for anyone
+  # else. It stays off until the maintainer turns it on by setting the
+  # repository variable NPM_PUBLISH to true and adding an NPM_TOKEN secret.
+  #
+  # `npm publish --dry-run` first, always: the tarball contents are the product,
+  # and `files` in package.json is what decides them.
+  publish:
+    needs: release
+    if: vars.NPM_PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    # `id-token: write` is what `npm publish --provenance` mints its OIDC token
+    # with. Without it npm exits `code EUSAGE` with 'Provenance generation in
+    # GitHub Actions requires "write" access to the "id-token" permission' and
+    # publishes nothing. It is also narrower than the workflow-level grant this
+    # job inherits: publishing needs `contents: read`, not write.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+
+      - name: Show the tarball before shipping it
+        run: npm publish --dry-run
+
+      - name: Publish
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

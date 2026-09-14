@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "quick-titles",
+  "description": "On-device session titles and descriptions for Claude Code. Nothing leaves the machine.",
+  "owner": {
+    "name": "asterxsk",
+    "url": "https://github.com/asterxsk"
+  },
+  "plugins": [
+    {
+      "name": "quick-titles",
+      "description": "Generates a real session title from your first prompt and refines it a couple of turns later, using a small model that runs entirely on your machine. Replaces the default titler, adds no network calls, and is licensed so the weights stay with their authors.",
+      "author": {
+        "name": "asterxsk"
+      },
+      "source": "./adapters/claude-code",
+      "category": "productivity",
+      "homepage": "https://github.com/asterxsk/quick-titles#readme",
+      "keywords": ["titles", "session", "local", "on-device", "llama.cpp"]
+    }
+  ]
+}

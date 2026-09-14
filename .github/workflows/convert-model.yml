@@ -1,0 +1,179 @@
+# .github/workflows/convert-model.yml
+name: Convert title model to GGUF
+
+on:
+  workflow_dispatch:
+  push:
+    # Only main: the `paths` entry below fires on edits to this file, and every
+    # Dependabot action bump edits this file — so without a branch filter each
+    # action bump launched a full macOS conversion job. `tools/verify-gguf.mjs`
+    # replaces a `tools/convert/**` glob that named a directory which has never
+    # existed, so the one tool this workflow actually runs could be edited
+    # without triggering it.
+    branches: [main]
+    paths:
+      - "tools/verify-gguf.mjs"
+      - ".github/workflows/convert-model.yml"
+
+# The two toolchains in this job need different, mutually exclusive versions of
+# transformers, and pip cannot hold both at once:
+#
+#   mlx-lm 0.31.3            requires transformers>=5.0.0
+#   llama.cpp requirements   pins     transformers==4.57.6
+#
+# The pin is not in a file that can be avoided: requirements-convert_hf_to_gguf.txt
+# starts with `-r ./requirements-convert_legacy_llama.txt`, and that file carries
+# the pin. Both halves of the job also need to read the model's tokenizer, and
+# desert-ant-labs/title ships a transformers-5 tokenizer — `tokenizer_config.json`
+# declares `"backend": "tokenizers"` with `"tokenizer_class": "TokenizersBackend"`,
+# a class that exists in 5.x and not in 4.x — so the naive ordering fails twice,
+# at two different steps, with the same error:
+#
+#   ValueError: Tokenizer class TokenizersBackend does not exist or is not currently imported.
+#
+# The split below handles both. mlx-lm installs alone and the dequantise runs
+# against transformers 5.x, where the tokenizer loads natively. llama.cpp's
+# requirements then land and downgrade transformers to the 4.57.6 that
+# convert_hf_to_gguf.py is tested against, and the step between them makes the
+# tokenizer loadable under 4.x. Order is load-bearing; do not merge or move the
+# install steps, and do not move the tokenizer step above the converter install
+# — it has to run while transformers is 4.x for its self-check to mean anything.
+jobs:
+  convert:
+    # MLX requires Apple silicon. `macos-15` is the arm64 image — the Intel one
+    # is the separate `macos-15-intel` label — and it replaces `macos-14`, which
+    # retires on 2026-11-02, after which jobs targeting it fail to start.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install the MLX toolchain
+        run: |
+          python -m pip install --upgrade pip
+          pip install mlx-lm huggingface_hub
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
+
+      # `hf`, not `huggingface-cli`: huggingface_hub 1.x removed the old command
+      # and it now exits 1 with "huggingface-cli is deprecated and no longer
+      # works. Use `hf` instead." This step used to pass by accident — llama.cpp's
+      # requirements were installed before it and downgraded huggingface-hub to
+      # 0.36.2, which still shipped a working `huggingface-cli`. Moving that
+      # install after the dequantise removed the downgrade and exposed the real
+      # dependency on a command that had already been deleted upstream. Do not
+      # put `huggingface-cli` back, and do not pin huggingface-hub down to 0.x to
+      # make it work.
+      - name: Fetch the MLX weights
+        run: |
+          hf download desert-ant-labs/title \
+            --local-dir mlx-model
+
+      - name: Verify the weights really are 6-bit affine group 64
+        run: |
+          python - <<'PY'
+          import json, sys
+          cfg = json.load(open("mlx-model/config.json"))
+          q = cfg.get("quantization") or cfg.get("quantization_config") or {}
+          print("quantization:", q)
+          assert q.get("bits") == 6, f"expected 6-bit, got {q.get('bits')}"
+          assert q.get("group_size") == 64, f"expected group 64, got {q.get('group_size')}"
+          PY
+
+      - name: Dequantise 6-bit MLX back to bf16 safetensors
+        run: |
+          mlx_lm.convert --hf-path mlx-model --mlx-path title-bf16 \
+            --dequantize --dtype bfloat16
+
+      # Runs after the dequantise, deliberately. This is the install that pins
+      # transformers==4.57.6; see the comment above the `jobs:` key.
+      - name: Install the GGUF converter toolchain
+        run: pip install -r llama.cpp/requirements.txt
+
+      # convert_hf_to_gguf.py loads the tokenizer through
+      # `AutoTokenizer.from_pretrained` (conversion/base.py, `get_vocab_base`,
+      # reached via `_set_vocab_gpt2`), so the 4.57.6 now on the path has to be
+      # able to name the class in tokenizer_config.json — and `TokenizersBackend`
+      # is a 5.x class. This step points `tokenizer_class` at the class 4.x does
+      # provide for exactly this artifact.
+      #
+      # It is an adaptation of the *intermediate* directory, not of the model.
+      # The tokenizer is a self-contained `tokenizer.json` — the upstream repo has
+      # no vocab.json or merges.txt at all — and both classes wrap the same
+      # `tokenizers` BPE built from that file. Measured on the real tokenizer,
+      # `GPT2TokenizerFast` under 4.57.6 and `TokenizersBackend` under 5.17.0
+      # agree exactly: same 100352-entry id->token map, same 96 added tokens, and
+      # the same encodings for a battery of probe strings — the full sha256 of
+      # each of those three fingerprints is identical across the two. The GGUF's
+      # token list and its
+      # `tokenizer.ggml.pre` pre-tokenizer hash therefore cannot differ; only the
+      # name of the Python class holding the file does.
+      #
+      # The final load is the point of the step. It runs under transformers 4.57.6,
+      # so if the rewrite ever stops working — an upstream tokenizer change, a new
+      # llama.cpp pin — this fails here with the real error instead of three steps
+      # later inside the converter with a stack trace that reads like a model bug.
+      - name: Make the tokenizer loadable by the converter
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          from transformers import AutoTokenizer
+
+          cfg_path = pathlib.Path("title-bf16/tokenizer_config.json")
+          cfg = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
+          print("tokenizer_class before:", cfg.get("tokenizer_class"))
+          cfg["tokenizer_class"] = "GPT2TokenizerFast"
+          cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+
+          tok = AutoTokenizer.from_pretrained("title-bf16")
+          highest = max(tok.vocab.values())
+          print(f"loaded {type(tok).__name__}: "
+                f"vocab={len(tok.vocab)} max_id={highest} "
+                f"added={len(tok.get_added_vocab())}")
+          assert highest < len(tok.vocab), f"max token id {highest} >= vocab size {len(tok.vocab)}"
+          PY
+
+      - name: Convert to GGUF f16
+        run: |
+          python llama.cpp/convert_hf_to_gguf.py title-bf16 \
+            --outfile title-f16.gguf --outtype f16
+
+      - name: Quantise to Q8_0
+        run: |
+          cmake -S llama.cpp -B llama.cpp/build -DLLAMA_CURL=OFF
+          cmake --build llama.cpp/build --config Release -j --target llama-quantize
+          ./llama.cpp/build/bin/llama-quantize title-f16.gguf title-q8_0.gguf Q8_0
+
+      # verify-gguf.mjs loads the artifact through node-llama-cpp, which is a
+      # runtime dependency, so the node toolchain and node_modules have to be
+      # here too — the earlier steps are all Python and cmake. `--omit=dev`
+      # installs exactly the two packages this needs and skips the devDependency
+      # blob (the Pi SDK pulls in the AWS and Anthropic SDKs), which is most of
+      # the install time on a minute-billed macOS runner.
+      #
+      # The check asserts architecture `granite`. The converter rewrites a hybrid
+      # model with no SSM layers to GRANITE_MOE or GRANITE depending on whether
+      # experts are present; this checkpoint has none, so `granite` is the
+      # correct result rather than a degraded conversion.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install the verifier's dependency
+        run: npm ci --omit=dev --no-audit --no-fund
+
+      - name: Check the GGUF is loadable and is granite
+        run: node tools/verify-gguf.mjs title-q8_0.gguf
+
+      - name: Checksum
+        run: shasum -a 256 title-q8_0.gguf | tee title-q8_0.gguf.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: title-q8_0
+          path: |
+            title-q8_0.gguf
+            title-q8_0.gguf.sha256

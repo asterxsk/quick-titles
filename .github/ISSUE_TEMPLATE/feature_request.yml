@@ -1,0 +1,54 @@
+name: Feature request
+description: A new agent to support, a new surface, or a change to how titles work
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, these are settled design decisions rather than open questions, and a
+        request that turns on one of them needs an argument for reversing it:
+
+        - **No session recap.** quick-titles writes titles and descriptions. Summarising a whole
+          session was considered and deliberately left out.
+        - **No network after provisioning.** No telemetry, no hosted model, no sync.
+        - **No writing a host agent's storage directly** when it exposes no documented API for
+          titles. The adapter no-ops instead.
+        - **No compiling llama.cpp on a user's machine.** Prebuilt binaries only.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you unable to do today? Describe the situation, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: If you already know how you would build it, say so.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part
+      options:
+        - A new agent adapter
+        - An existing adapter
+        - The CLI
+        - The daemon or the client
+        - Model quality or prompt
+        - Docs
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: Including "nothing, there is no way to do this today" — that is a useful answer.
+    validations:
+      required: false
