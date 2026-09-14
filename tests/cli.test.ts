@@ -479,7 +479,11 @@ process.exit(3);
 
       expect(code).toBe(1);
       expect(stdout).toContain("Desert Ant Labs Source-Available License 1.0");
-      expect(stdout).toContain("(d)");
+      // The clause that constrains this project, quoted verbatim rather than
+      // referenced by letter. The notice used to say "(c)" and "(d)"; a reader
+      // with the licence open could not match either letter to a clause, so the
+      // text is quoted instead and the letters are gone. This asserts the text.
+      expect(stdout).toContain("Do not redistribute the Models on their own");
       expect(stdout).toContain("licensing@desertant.com");
       expect(stdout).toContain("--accept-license");
       // Nothing was started, so nothing was created to clean up.

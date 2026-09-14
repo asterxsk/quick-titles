@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A packaging test that packs the real npm tarball, unpacks it elsewhere, and runs the shipped
   code with no repository around it. It exists because `files` in `package.json` shipped a package
   missing two files the code reads at import.
+- **A "Legal status" section in the README** explaining that the project is incomplete for a
+  licensing reason rather than a development one, with a table mapping each gap to the clause that
+  causes it, and a plain statement that none of it is legal advice.
+
+### Fixed
+
+- **Three public documents said ChatGPT-app Codex threads "cannot be titled" because their titles
+  live on OpenAI's servers.** That was wrong, and `docs/adapter-verification.md` had already
+  retracted it. The desktop app is an app-server client on the CLI's own thread store and the write
+  path is implemented; what is unverified is the trigger. `README.md`, `CHANGELOG.md` and
+  `docs/install.md` now say that instead (D61).
+- **`tests/cli.test.ts` asserted the licence notice contains the string `(d)`.** The notice was
+  rewritten to quote the clauses verbatim rather than refer to them by letter, so the assertion
+  could not pass — and the string it was testing for meant nothing to a reader anyway. It now
+  asserts the clause text.
 
 ## [0.1.0] — 2026-09-14
 

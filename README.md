@@ -25,7 +25,8 @@ Works with **Claude Code**, **Codex CLI**, **opencode2** (beta), and **Pi**.
 ## Quickstart
 
 > **Status:** v0.1.0 is in development and not yet published to npm. The commands below are the
-> target interface.
+> target interface. Part of the reason it is incomplete is a licensing constraint rather than a
+> development one — see [Legal status](#legal-status--why-this-project-is-incomplete).
 
 **Claude Code**
 
@@ -133,6 +134,39 @@ both of them one-time and both of them yours to run: `provision` fetches the con
 **no network requests at all** — no telemetry, no analytics, no crash reporting. Nothing is ever
 uploaded, by either command.
 
+## Legal status — why this project is incomplete
+
+**The project is unfinished for a licensing reason, not a technical one, and it is better to say so
+up front than to let it look like ordinary work in progress.**
+
+The title model is [`desert-ant-labs/title`](https://huggingface.co/desert-ant-labs/title), released
+under the [Desert Ant Labs Source-Available License 1.0](https://license.desertant.com/1.0). That is
+**not an open-source licence.** It grants the right to modify the weights and embed them in an
+application you ship. It forbids distributing them — or a substantially unmodified derivative of
+them — "as a standalone product, model, SDK, or hosted service". A converted GGUF is both a
+derivative of the weights and, on a release page, standalone.
+
+Three gaps follow directly from that one clause:
+
+| What is missing | Why it is missing |
+|---|---|
+| **No published weights URL.** `provision` has nothing to fetch, and says so rather than guessing. | Hosting the converted GGUF would be distributing a derivative as a standalone model. |
+| **`model-build` needs Python and `git`, and does not run on Windows.** | Local conversion is the one path that redistributes nothing — it runs on your machine, from the publisher's own download. MLX, whose quantisation format the publisher's weights use, ships no Windows build. |
+| **No model in the npm package, ever.** | Same clause, applied to the tarball. |
+
+So the shipped package cannot carry the model, and the one command that can produce it does not run
+on Windows. That is the whole of the incompleteness — the rest of this README describes code that
+exists in this repository and runs. The [defect register](docs/plan-deviations.md) records what was
+tested and what was not.
+
+This is this project's reading of the licence, not a lawyer's, and it is stated as a reading rather
+than as settled law. If you need certainty before relying on it, ask the licensor directly:
+`licensing@desertant.com`. The clause in full, the argument on both sides, and what would make
+publishing a converted model permissible are in [LICENSE-NOTICE.md](LICENSE-NOTICE.md).
+
+**Not legal advice.** Do not treat this section, or anything else in this repository, as a legal
+opinion or as a substitute for one.
+
 ## Model and attribution
 
 The title model is [`desert-ant-labs/title`](https://huggingface.co/desert-ant-labs/title), a
@@ -144,11 +178,8 @@ quick-titles is a delivery mechanism for their work, not a competitor to it.
 
 That line is a licence requirement, not a courtesy, so it is emitted verbatim by
 `quick-titles --version`, `quick-titles sessions`, `quick-titles doctor`, and the daemon's startup
-log as well. Their licence (§6) forbids distributing the model "or a substantially unmodified
-derivative … as a standalone product, model, SDK, or hosted service", and a converted GGUF is both a
-derivative and, on a release page, standalone. That is why quick-titles converts on your machine,
-from the publisher's own download, instead of publishing the file as a release asset. See
-[LICENSE-NOTICE.md](LICENSE-NOTICE.md) for the clause in full and the argument on both sides.
+log as well. See [Legal status](#legal-status--why-this-project-is-incomplete) above for the clause
+it comes from and [LICENSE-NOTICE.md](LICENSE-NOTICE.md) for it in full.
 
 Inference runs on [llama.cpp](https://github.com/ggml-org/llama.cpp) via
 [node-llama-cpp](https://github.com/withcatai/node-llama-cpp). See [LICENSE-NOTICE.md](LICENSE-NOTICE.md)
