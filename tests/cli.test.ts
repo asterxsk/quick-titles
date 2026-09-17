@@ -490,6 +490,42 @@ process.exit(3);
       expect(existsSync(join(dataDir, "build"))).toBe(false);
     });
 
+    it("prints the WSL guide and exits without asking for the licence", async () => {
+      // The whole point of the flag is that it answers a question rather than
+      // performing an action, so the two things it must not do are build and
+      // ask anyone to accept anything.
+      const { code, stdout } = await cli(["model-build", "--guide"]);
+
+      expect(code).toBe(0);
+      expect(stdout).toContain("mlx_lm.convert");
+      expect(stdout).toContain("python3-venv");
+      expect(stdout).not.toContain("accept-license to continue");
+    });
+
+    it("prints the guide even when a model is already provisioned", async () => {
+      // "You already have a model" is not an answer to "how would I build one",
+      // and the guide is the only route for a Windows user — who may well have
+      // a model they built on another machine.
+      const { code, stdout } = await cli(["model-build", "--guide"], { model: true });
+
+      expect(code).toBe(0);
+      expect(stdout).toContain("mlx_lm.convert");
+      expect(stdout).not.toContain("already provisioned");
+    });
+
+    it("names the reader's own data directory in the copy step", async () => {
+      // The one step of the guide that is machine-specific, and the whole
+      // reason `wslGuide` takes an argument: it has to be rendered from the
+      // calling platform's data directory, not from whichever one the module
+      // would resolve for itself. Both spellings are printed — the /mnt form to
+      // paste, the Windows form to check against `doctor`.
+      const dataDir = tempDirSync("qt-cli-");
+      const { stdout } = await cli(["model-build", "--guide"], { dataDir });
+
+      expect(stdout).toContain(dataDir);
+      expect(stdout).toMatch(/\/mnt\/[a-z]\/.*models\/title-q8_0\.gguf/);
+    });
+
     it("does not ask anyone to accept a licence for a build it will not run", async () => {
       // A model that is already provisioned is the common case for a second
       // run, and a wall of licence text in front of "there is nothing to do"

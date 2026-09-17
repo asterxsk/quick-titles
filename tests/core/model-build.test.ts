@@ -30,6 +30,8 @@ import {
   removeBuildDir,
   runModelBuild,
   venvPython,
+  wslGuide,
+  wslPath,
   DEFAULT_LLAMA_TAG,
   type BuildStep,
 } from "../../src/core/model-build.js";
@@ -138,6 +140,73 @@ describe("licenseNotice", () => {
   it("states where everything is installed and that it is removed", () => {
     expect(notice).toContain("virtual environment");
     expect(notice).toContain("never modified");
+  });
+});
+
+describe("wslPath", () => {
+  it("spells a Windows path the way WSL mounts it", () => {
+    expect(wslPath("C:\\Users\\me\\AppData\\Local\\quick-titles\\models\\title-q8_0.gguf")).toBe(
+      "/mnt/c/Users/me/AppData/Local/quick-titles/models/title-q8_0.gguf"
+    );
+  });
+
+  it("lowercases the drive letter and leaves the rest alone", () => {
+    // Windows user directories contain spaces often enough that a guide telling
+    // someone to `cp` into one without quoting would send them to a broken
+    // command. Nothing here rewrites the path beyond the drive and separator.
+    expect(wslPath("D:\\Apps\\My Project")).toBe("/mnt/d/Apps/My Project");
+  });
+
+  it("passes through anything that is not a drive-letter path", () => {
+    // Already a unix path, or a UNC path — nothing to translate, and inventing
+    // a /mnt/ prefix for either would produce a path that cannot exist.
+    expect(wslPath("/home/me/qt-build")).toBe("/home/me/qt-build");
+    expect(wslPath("quick-titles")).toBe("quick-titles");
+  });
+});
+
+describe("wslGuide", () => {
+  const guide = wslGuide("C:\\Users\\me\\AppData\\Local\\quick-titles");
+
+  it("names the step that forces WSL rather than just naming WSL", () => {
+    // "Use WSL" is not a guide. The dequantise is the step with no substitute,
+    // and it is what the reader has to be told to run.
+    expect(guide).toContain("mlx_lm.convert");
+    expect(guide.toLowerCase()).toContain("dequantis");
+    expect(guide).toContain("MLX");
+  });
+
+  it("installs what a minimal Ubuntu image is missing", () => {
+    // The venv is created in step 4 and `python3-venv` is not in a stock image.
+    // Without this line the guide fails at its own step 4 with an ensurepip
+    // error that does not name the package.
+    expect(guide).toContain("python3-venv");
+    expect(guide).toContain("python3 -m venv");
+  });
+
+  it("writes the finished model to the path the Windows daemon reads", () => {
+    expect(guide).toContain("/mnt/c/Users/me/AppData/Local/quick-titles/models/title-q8_0.gguf");
+    // And states the Windows spelling too, so the reader can check the result
+    // against `doctor` without translating in their head.
+    expect(guide).toContain("C:\\Users\\me\\AppData\\Local\\quick-titles");
+    expect(guide).toContain("quick-titles doctor");
+  });
+
+  it("warns that the licence travels with the weights", () => {
+    // The guide walks the reader through a reproduction of the conversion this
+    // project refuses to publish. Someone who reaches it without having read
+    // `model-build`'s notice still has to know the weights are not open source.
+    expect(guide).toContain("Desert Ant Labs Source-Available License 1.0");
+  });
+
+  it("says it has not been run on WSL, rather than implying it has", () => {
+    expect(guide).toContain("None of this has been run end to end on WSL yet");
+  });
+
+  it("pins the llama.cpp tag it tells the reader to download", () => {
+    // The tag is a default that goes stale. If it is ever bumped, the guide's
+    // URL has to move with it, and a hardcoded string here would not.
+    expect(guide).toContain(DEFAULT_LLAMA_TAG);
   });
 });
 

@@ -13,6 +13,12 @@ No API calls, no telemetry, no session content leaving your machine.
 
 </div>
 
+> **Untested on Windows, and new overall.** This project is days old. The adapters, daemon, and
+> conversion have been run on macOS; the Linux and WSL paths are untested, and on Windows the only
+> route to a model is `npx quick-titles model-build --guide` — step-by-step instructions for WSL
+> that have never been run end to end. Expect rough edges, and
+> [report them](https://github.com/asterxsk/quick-titles/issues).
+
 ---
 
 Your agent's session list is a wall of `New session` and `Untitled`. quick-titles reads the first
@@ -151,13 +157,16 @@ Three gaps follow directly from that one clause:
 | What is missing | Why it is missing |
 |---|---|
 | **No published weights URL.** `provision` has nothing to fetch, and says so rather than guessing. | Hosting the converted GGUF would be distributing a derivative as a standalone model. |
-| **`model-build` needs Python and `git`, and does not run on Windows.** | Local conversion is the one path that redistributes nothing — it runs on your machine, from the publisher's own download. MLX, whose quantisation format the publisher's weights use, ships no Windows build. |
+| **`model-build` needs Python and `git`, and does not run on Windows directly.** | Local conversion is the one path that redistributes nothing — it runs on your machine, from the publisher's own download. MLX, whose quantisation format the publisher's weights use, ships no Windows build. For the WSL route, `model-build --guide` prints it step by step — untested, see below. |
 | **No model in the npm package, ever.** | Same clause, applied to the tarball. |
 
 So the shipped package cannot carry the model, and the one command that can produce it does not run
-on Windows. That is the whole of the incompleteness — the rest of this README describes code that
-exists in this repository and runs. The [defect register](docs/plan-deviations.md) records what was
-tested and what was not.
+on Windows. For Windows there is a new route — `npx quick-titles model-build --guide`, which prints
+the conversion as commands to run in WSL, with the copy destination filled in — and it is also the
+least-tested thing in this project. The guide says so itself: neither it nor the Linux path it is
+modelled on has been run end to end, and this is a new project — the maintainer has not got to it
+yet. Everything else in this README describes code that exists in this repository and runs. The
+[defect register](docs/plan-deviations.md) records what was tested and what was not.
 
 This is this project's reading of the licence, not a lawyer's, and it is stated as a reading rather
 than as settled law. If you need certainty before relying on it, ask the licensor directly:

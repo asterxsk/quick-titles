@@ -109,15 +109,31 @@ about **2 GB of disk at peak**, and these requirements — which nothing else in
 
 | | |
 |---|---|
-| Platform | Apple silicon macOS, or Linux with glibc 2.35+ (Ubuntu 22.04 and newer). **No Windows** — MLX ships no Windows build; use WSL. |
+| Platform | Apple silicon macOS, or Linux with glibc 2.35+ (Ubuntu 22.04 and newer). On Windows, see the WSL route below. |
 | Tools | Python 3.11+, `git` |
 | Network | Two downloads: the weights (~294 MB) and a prebuilt llama.cpp archive (~16 MB) |
 
+**Windows: build through WSL, then copy the file over.**
+
+`model-build` cannot run on Windows itself — MLX, whose format the publisher's weights use, ships no
+Windows build — so there is a separate flag that prints the whole route as commands to run in a WSL
+shell, with the copy destination already filled in:
+
+```bash
+npx quick-titles model-build --guide
+```
+
+It builds on the Linux side (never under `/mnt/c`, which is far slower), then copies the finished
+GGUF into the Windows data directory the daemon reads. `doctor` confirms it landed. The flag prints
+and exits; it never builds and never asks for the licence.
+
 **Which platforms have actually been run.** Only Apple silicon macOS. That is what
 `.github/workflows/convert-model.yml` executes, and the pipeline below is transcribed from it. The
-Linux path is real — `mlx[cpu]` is a published wheel and the command is otherwise identical — but
-nobody has run this end to end on Linux, and the `mlx[cpu]` dequantise in particular is the step with
-no substitute if it turns out not to work there. Treat a first Linux run as the test that it is, and
+Linux path, and the WSL guide built from it, are real in the same sense — `mlx[cpu]` is a published
+wheel — but nobody has run either one end to end, and the `mlx[cpu]` dequantise in particular is the
+step with no substitute if it turns out not to work there. The `--guide` output says this itself,
+rather than letting a reader infer a tested path from a confident one. Treat a first Linux or WSL
+run as the test that it is, and
 [open an issue](https://github.com/asterxsk/quick-titles/issues) either way.
 
 Nothing is compiled. `llama-quantize` comes from llama.cpp's published release binaries rather than

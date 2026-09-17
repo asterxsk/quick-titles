@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A "Legal status" section in the README** explaining that the project is incomplete for a
   licensing reason rather than a development one, with a table mapping each gap to the clause that
   causes it, and a plain statement that none of it is legal advice.
+- **`quick-titles model-build --guide`**, a Windows route through WSL. `model-build` itself cannot
+  run on Windows — MLX ships no Windows build — so the flag prints the whole conversion as numbered
+  commands to run in a WSL shell, with the copy destination already rendered from the reader's own
+  data directory. It builds nothing and asks for no licence. Untested: the guide says so itself, and
+  so do the README and install docs.
 
 ### Fixed
 

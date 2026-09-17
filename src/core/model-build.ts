@@ -44,7 +44,7 @@ import { spawn } from "node:child_process";
 import { copyFileSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { modelPath } from "../paths.js";
+import { MODEL_FILE, modelPath } from "../paths.js";
 
 /** The upstream model. Named here because both the notice and the download step
  *  have to agree on it, and a typo in either is a 15-minute failure. */
@@ -194,12 +194,177 @@ export function mlxToolchain(platform: string, arch: string): Toolchain {
       ok: false,
       reason:
         `MLX has no Windows build, so the 6-bit weights cannot be dequantised\n` +
-        `  here. Run this in WSL instead — Ubuntu 22.04 or newer, which is what\n` +
-        `  mlx[cpu] needs — or on an Apple silicon Mac, or ask the publisher for a\n` +
-        `  GGUF (${LICENSING_CONTACT}).`,
+        `  here. Three ways forward:\n` +
+        `    quick-titles model-build --guide   step-by-step, through WSL\n` +
+        `    build it on an Apple silicon Mac\n` +
+        `    ask the publisher for a GGUF (${LICENSING_CONTACT})`,
     };
   }
   return { ok: false, reason: `MLX does not support ${platform}, so this cannot run here.` };
+}
+
+/** Hands-on instructions for producing the GGUF on Windows, where this command
+ *  cannot run it.
+ *
+ *  `mlxToolchain` refuses win32 because MLX publishes no Windows build, and WSL
+ *  is the route that refusal names. That route needs more than "use WSL": the
+ *  MLX dequantise is the step with no substitute, so the guide leads with it and
+ *  derives the rest from what WSL actually has. Two facts drive the shape:
+ *
+ *  - The pipeline creates a virtual environment and installs into it. A minimal
+ *    Ubuntu image has no `python3-venv`, and `python3 -m venv` fails with a
+ *    message about ensurepip that does not name the package to install.
+ *  - WSL's `/mnt/c` is a 9p-style mount. Building there is slow enough to look
+ *    like a hang, so the guide builds in WSL's own filesystem and copies the
+ *    finished file out once.
+ *
+ *  `dataDir` is the Windows data directory, passed in because this file cannot
+ *  compute it: `paths.dataDir()` answers for whatever platform Node reports, and
+ *  the whole point here is that the two platforms disagree. */
+export function wslGuide(dataDir: string): string {
+  const dest = join(dataDir, "models", MODEL_FILE);
+
+  return (
+    `Building the GGUF on Windows, through WSL\n` +
+    `\n` +
+    `quick-titles cannot run its own conversion on Windows: the publisher's\n` +
+    `weights are 6-bit MLX, and the step that gets bfloat16 back out of them\n` +
+    `needs MLX, which publishes no Windows build. WSL runs the Linux build, and\n` +
+    `the result works on the Windows side — the daemon only ever reads the file.\n` +
+    `\n` +
+    `This is a set of commands to run yourself, not something this command can\n` +
+    `do for you. Roughly 10 to 20 minutes, about 4 GB of disk inside WSL, and\n` +
+    `two downloads: the weights (~294 MB) and a prebuilt llama.cpp archive.\n` +
+    `Nothing is compiled. Run these in a WSL shell, in order.\n` +
+    `\n` +
+    `0. Install WSL, if you have not. Ubuntu 22.04 or newer: MLX's Linux build\n` +
+    `   needs glibc 2.35. In an admin PowerShell:\n` +
+    `\n` +
+    `     wsl --install -d Ubuntu\n` +
+    `\n` +
+    `1. Confirm you are in the Linux home directory, not under /mnt/c. Building\n` +
+    `   on the Windows mount works but is far slower:\n` +
+    `\n` +
+    `     cd ~ && pwd\n` +
+    `\n` +
+    `2. System packages. python3-venv is the one that is easy to miss — without\n` +
+    `   it, creating the virtual environment fails at step 5:\n` +
+    `\n` +
+    `     sudo apt update\n` +
+    `     sudo apt install -y python3 python3-venv python3-pip git curl\n` +
+    `\n` +
+    `3. A working directory:\n` +
+    `\n` +
+    `     mkdir -p ~/qt-build && cd ~/qt-build\n` +
+    `\n` +
+    `4. A virtual environment. Everything installs into it, so nothing on your\n` +
+    `   system is touched and deleting the directory undoes all of it:\n` +
+    `\n` +
+    `     python3 -m venv venv && . venv/bin/activate\n` +
+    `\n` +
+    `5. The MLX toolchain. Do not run pip as root and do not use --break-system-\n` +
+    `   packages; the venv is why neither is needed:\n` +
+    `\n` +
+    `     pip install --upgrade pip\n` +
+    `     pip install "mlx[cpu]" mlx-lm huggingface_hub\n` +
+    `\n` +
+    `6. The publisher's weights, fetched by you, from them:\n` +
+    `\n` +
+    `     hf download ${MODEL_REPO} --local-dir mlx-model\n` +
+    `\n` +
+    `   These are under the ${LICENSE_NAME}, not an open-source\n` +
+    `   licence — run quick-titles model-build on a Mac, or read that licence\n` +
+    `   first, before you rely on what you can do with the result.\n` +
+    `\n` +
+    `7. Confirm they really are 6-bit affine group 64 before spending 15 minutes\n` +
+    `   converting them. If this fails, the publisher changed the release and the\n` +
+    `   rest of this guide no longer describes it:\n` +
+    `\n` +
+    `     python -c "import json; q=json.load(open('mlx-model/config.json'))['quantization']; ` +
+    `print(q); assert q['bits']==6 and q['group_size']==64"\n` +
+    `\n` +
+    `8. The dequantise — the whole reason WSL is involved:\n` +
+    `\n` +
+    `     mlx_lm.convert --hf-path mlx-model --mlx-path title-bf16 \\\n` +
+    `       --dequantize --dtype bfloat16\n` +
+    `\n` +
+    `9. llama.cpp's converter, then the conversion itself. The requirements file\n` +
+    `   pins a transformers version older than mlx-lm needs, which is why this is\n` +
+    `   a second install and not part of step 5:\n` +
+    `\n` +
+    `     git clone --depth 1 https://github.com/ggml-org/llama.cpp.git\n` +
+    `     pip install -r llama.cpp/requirements.txt\n` +
+    `\n` +
+    `     python - <<'PY'\n` +
+    `     import json, pathlib\n` +
+    `     p = pathlib.Path("title-bf16/tokenizer_config.json")\n` +
+    `     cfg = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}\n` +
+    `     cfg["tokenizer_class"] = "GPT2TokenizerFast"\n` +
+    `     p.write_text(json.dumps(cfg, indent=2) + "\\n", encoding="utf-8")\n` +
+    `     PY\n` +
+    `\n` +
+    `     python llama.cpp/convert_hf_to_gguf.py title-bf16 \\\n` +
+    `       --outfile title-f16.gguf --outtype f16\n` +
+    `\n` +
+    `   The tokenizer rewrite edits the intermediate copy, not the model. It\n` +
+    `   points tokenizer_class at the class the pinned transformers does have;\n` +
+    `   both classes wrap the same tokenizers BPE built from the same\n` +
+    `   tokenizer.json, so the GGUF's token list is unaffected.\n` +
+    `\n` +
+    `10. Quantise to Q8_0. Grab a prebuilt archive rather than building cmake:\n` +
+    `\n` +
+    `      curl -L -o llama-bin.tar.gz \\\n` +
+    `        https://github.com/ggml-org/llama.cpp/releases/download/` +
+    `${DEFAULT_LLAMA_TAG}/llama-${DEFAULT_LLAMA_TAG}-bin-ubuntu-x64.tar.gz\n` +
+    `      tar -xzf llama-bin.tar.gz\n` +
+    `      ./llama-${DEFAULT_LLAMA_TAG}/llama-quantize \\\n` +
+    `        title-f16.gguf title-q8_0.gguf Q8_0\n` +
+    `\n` +
+    `11. Copy the finished file into the directory the Windows daemon reads.\n` +
+    `    WSL can see the Windows drive, so this needs no transfer tool. Quote the\n` +
+    `    paths: a Windows user directory can contain spaces.\n` +
+    `\n` +
+    `      mkdir -p "${dirname(wslPath(dest))}"\n` +
+    `      cp title-q8_0.gguf "${wslPath(dest)}"\n` +
+    `\n` +
+    `    That is the WSL spelling of this Windows path:\n` +
+    `      ${dest}\n` +
+    `\n` +
+    `12. In Windows, confirm it landed:\n` +
+    `\n` +
+    `      npx quick-titles doctor\n` +
+    `\n` +
+    `13. Optional, and worth the disk if you build again: the build directory\n` +
+    `    holds a full bf16 copy of the model. Once doctor reports the model, the\n` +
+    `    rest is reproducible:\n` +
+    `\n` +
+    `      cd ~ && rm -rf ~/qt-build\n` +
+    `\n` +
+    `Do not delete title-q8_0.gguf itself. It is the whole point, and rebuilding\n` +
+    `it means running this guide again.\n` +
+    `\n` +
+    `Step 11 is the one this project tested least. If the copy lands somewhere\n` +
+    `WSL cannot write, or doctor still reports no model, point QT_MODEL at the\n` +
+    `GGUF wherever it ended up — that override skips the data directory entirely.\n` +
+    `\n` +
+    `None of this has been run end to end on WSL yet, and the Linux path it is\n` +
+    `modelled on is unproven too. Expect to report a bug.\n` +
+    `  https://github.com/asterxsk/quick-titles/issues\n`
+  );
+}
+
+/** The WSL mount spelling of a Windows path.
+ *
+ *  `C:\Users\me\AppData\Local\quick-titles` becomes
+ *  `/mnt/c/Users/me/AppData/Local/quick-titles`. Only the directory separator
+ *  and the drive letter's case change; the rest of the path is passed through
+ *  untouched, because a Windows user directory can contain spaces and rewriting
+ *  more than the two known differences would be guessing. */
+export function wslPath(winPath: string): string {
+  const unix = winPath.replace(/\\/g, "/");
+  const m = /^([A-Za-z]):\/(.*)$/.exec(unix);
+  if (!m) return unix;
+  return `/mnt/${m[1].toLowerCase()}/${m[2]}`;
 }
 
 /** The prebuilt archive carrying `llama-quantize`, and the path it unpacks to.

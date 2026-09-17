@@ -46,6 +46,7 @@ function usage() {
       `  quick-titles uninstall [agent] Remove it again (default: every agent)\n` +
       `  quick-titles provision         Download the model, once, verified\n` +
       `  quick-titles model-build       Build the model here from the publisher's weights\n` +
+      `                                 --guide explains the Windows route through WSL\n` +
       `  quick-titles sessions          List recent sessions with their titles\n` +
       `  quick-titles doctor            Report what is provisioned and what is running\n` +
       `  quick-titles --version         Print the version\n` +
@@ -474,6 +475,14 @@ async function sessions() {
  *  a position on a licence clause, and `-y` implies it is a formality. */
 const ACCEPT = "--accept-license";
 
+/** The flag that prints the Windows route instead of trying to run it here.
+ *
+ *  A separate flag rather than a fallback on refusal: on Windows the refusal is
+ *  certain, but a macOS user wanting to build for a Windows machine, or anyone
+ *  who would rather drive it by hand, is asking the same question. It never
+ *  builds and never asks for the licence, so it is safe to run first. */
+const GUIDE = "--guide";
+
 /** Converts the upstream weights into the GGUF quick-titles runs.
  *
  *  The order of the two checks matters. An already-provisioned model is
@@ -482,10 +491,19 @@ const ACCEPT = "--accept-license";
  *  flag is honoured, so `--accept-license` is an answer to something the user
  *  was actually shown rather than a magic word they were told to type. */
 async function modelBuild(args) {
-  const prepared = await prepareModelBuild();
+  const prepared = await prepareModelBuild({ explainOnly: args.includes(GUIDE) });
   if (typeof prepared === "number") return prepared;
 
-  const { build, workDir, python, llamaTag } = prepared;
+  const { build, workDir, python, llamaTag, dataDir } = prepared;
+
+  // Before the notice, and instead of it. `--guide` builds nothing and asks for
+  // nothing, so printing a licence notice the user is not being asked to accept
+  // would be noise in front of the answer they came for.
+  if (args.includes(GUIDE)) {
+    process.stdout.write(build.wslGuide(dataDir) + "\n");
+    return 0;
+  }
+
   process.stdout.write(`quick-titles: building the model locally\n\n${build.licenseNotice()}\n`);
 
   if (!args.includes(ACCEPT)) {
@@ -515,8 +533,13 @@ async function modelBuild(args) {
  *
  *  The two guards and the two environment defaults live here rather than in
  *  `modelBuild`, so that the command reads as the three things it does —
- *  explain the licence, take the answer, run the build. */
-async function prepareModelBuild() {
+ *  explain the licence, take the answer, run the build.
+ *
+ *  `explainOnly` is `--guide`: the already-provisioned short-circuit is skipped,
+ *  because a guide is not a request to build and "you already have a model" is
+ *  not an answer to "how would I build one". The dist/ guard still applies —
+ *  the guide is text that ships inside it. */
+async function prepareModelBuild({ explainOnly = false } = {}) {
   if (!existsSync(join(dist, "core", "model-build.js"))) {
     process.stderr.write(
       `quick-titles: dist/ is missing, so there is nothing to build with.\n` +
@@ -531,7 +554,7 @@ async function prepareModelBuild() {
     import(pathToFileURL(join(dist, "core", "provision.js")).href),
   ]);
 
-  if (modelIsPresent(provision.modelStatus())) return 0;
+  if (!explainOnly && modelIsPresent(provision.modelStatus())) return 0;
 
   return {
     build,
@@ -539,6 +562,10 @@ async function prepareModelBuild() {
     // looks and where `doctor` can report on it, and a rebuild that filled a
     // second location would be a second thing to clean up.
     workDir: join(paths.dataDir(), "build"),
+    // Handed to `wslGuide`, which cannot compute it: this file resolves paths
+    // for the platform Node is running on, and the guide exists precisely for
+    // the case where the build happens on a different one.
+    dataDir: paths.dataDir(),
     ...buildEnvironment(),
   };
 }
