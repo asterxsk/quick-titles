@@ -518,12 +518,16 @@ process.exit(3);
       // reason `wslGuide` takes an argument: it has to be rendered from the
       // calling platform's data directory, not from whichever one the module
       // would resolve for itself. Both spellings are printed — the /mnt form to
-      // paste, the Windows form to check against `doctor`.
+      // paste, the Windows form to check against `doctor`. The /mnt spelling
+      // only exists for drive-letter paths, so it is asserted on Windows only;
+      // elsewhere the unix path passes through untouched.
       const dataDir = tempDirSync("qt-cli-");
       const { stdout } = await cli(["model-build", "--guide"], { dataDir });
 
-      expect(stdout).toContain(dataDir);
-      expect(stdout).toMatch(/\/mnt\/[a-z]\/.*models\/title-q8_0\.gguf/);
+      expect(stdout).toContain(join(dataDir, "models", "title-q8_0.gguf"));
+      if (process.platform === "win32") {
+        expect(stdout).toMatch(/\/mnt\/[a-z]\/.*models\/title-q8_0\.gguf/);
+      }
     });
 
     it("does not ask anyone to accept a licence for a build it will not run", async () => {
