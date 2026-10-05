@@ -56,7 +56,7 @@
     "vitest": "^5.0.0"
   },
   "dependencies": {
-    "node-llama-cpp": "^3.21.1",
+    "node-llama-cpp": "^3.22.1",
     "smol-toml": "^1.8.0"
   }
 }
